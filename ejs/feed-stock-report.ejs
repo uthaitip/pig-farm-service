@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600&display=swap');
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Sarabun', sans-serif;
+      font-size: 13px;
+      color: #1a1a1a;
+      padding: 32px 40px;
+    }
+
+    .header {
+      text-align: center;
+      margin-bottom: 24px;
+    }
+
+    .header h1 {
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+
+    .header p {
+      font-size: 12px;
+      color: #555;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 8px;
+    }
+
+    thead tr {
+      background-color: #2d6a4f;
+      color: #fff;
+    }
+
+    thead th {
+      padding: 10px 12px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 13px;
+    }
+
+    tbody tr:nth-child(even) {
+      background-color: #f4f9f6;
+    }
+
+    tbody td {
+      padding: 9px 12px;
+      border-bottom: 1px solid #e0e0e0;
+    }
+
+    .text-right { text-align: right; }
+    .text-center { text-align: center; }
+
+    .badge {
+      display: inline-block;
+      padding: 2px 10px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+
+    .badge-active { background: #d1fae5; color: #065f46; }
+    .badge-inactive { background: #fee2e2; color: #991b1b; }
+
+    .low-stock { color: #dc2626; font-weight: 600; }
+
+    .footer {
+      margin-top: 24px;
+      font-size: 11px;
+      color: #888;
+      text-align: right;
+    }
+
+    .summary {
+      margin-top: 16px;
+      display: flex;
+      gap: 16px;
+    }
+
+    .summary-box {
+      border: 1px solid #e0e0e0;
+      border-radius: 6px;
+      padding: 10px 16px;
+      min-width: 120px;
+    }
+
+    .summary-box .label { font-size: 11px; color: #666; }
+    .summary-box .value { font-size: 16px; font-weight: 600; margin-top: 2px; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>รายงานสต็อกอาหารสัตว์</h1>
+    <p>วันที่พิมพ์: <%= generatedAt %></p>
+  </div>
+
+  <div class="summary">
+    <div class="summary-box">
+      <div class="label">ทั้งหมด</div>
+      <div class="value"><%= stocks.length %> รายการ</div>
+    </div>
+    <div class="summary-box">
+      <div class="label">ต่ำกว่าขั้นต่ำ</div>
+      <div class="value low-stock"><%= lowStockCount %> รายการ</div>
+    </div>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th class="text-center" style="width:40px">#</th>
+        <th>ชื่ออาหาร</th>
+        <th class="text-center">หน่วย</th>
+        <th class="text-right">คงเหลือ</th>
+        <th class="text-right">ขั้นต่ำ</th>
+        <th class="text-center">สถานะ</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% stocks.forEach(function(stock, index) { %>
+      <tr>
+        <td class="text-center"><%= index + 1 %></td>
+        <td><%= stock.name %></td>
+        <td class="text-center"><%= stock.unit || '-' %></td>
+        <td class="text-right <%= stock.quantity <= stock.minQuantity ? 'low-stock' : '' %>">
+          <%= stock.quantity.toLocaleString() %>
+        </td>
+        <td class="text-right"><%= stock.minQuantity.toLocaleString() %></td>
+        <td class="text-center">
+          <span class="badge <%= stock.status === 'active' ? 'badge-active' : 'badge-inactive' %>">
+            <%= stock.status === 'active' ? 'ใช้งาน' : 'ปิด' %>
+          </span>
+        </td>
+      </tr>
+      <% }); %>
+    </tbody>
+  </table>
+
+  <div class="footer">
+    สร้างโดยระบบ Pig Farm Management
+  </div>
+</body>
+</html>
