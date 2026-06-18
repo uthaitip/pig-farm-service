@@ -25,7 +25,7 @@ export class CustomerController {
 
   @Get()
   async find(@Res() res: Response, @Query() query: PaginationDto) {
-    const filter = query.filter || {};
+    const filter = query.parsedFilter();
     const result = await this.service.pagination({
       pagination: query.toPagination(),
       filter: filter,
@@ -43,7 +43,10 @@ export class CustomerController {
 
   @Post()
   async create(@Res() res: Response, @Body() body: CreateCustomerDto) {
-    const result = await this.service.insert({ ...body, status: 'active' });
+    const result = await this.service.insertWithRunning(
+      { ...body, status: 'ACTIVE' },
+      'customerCode', 8, 'C',
+    );
     return MyResponse.sendOk(res, result);
   }
 

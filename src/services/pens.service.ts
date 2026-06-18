@@ -7,6 +7,7 @@ import { MongoService } from './mongo/mongo.service';
 @Injectable()
 export class PensService extends MongoService<Pen> {
   searchs = ['name'];
+  defaultPopulates = [{ path: 'houseId' }];
 
   constructor(@InjectModel(Pen.name) penModel: Model<Pen>) {
     super(penModel);

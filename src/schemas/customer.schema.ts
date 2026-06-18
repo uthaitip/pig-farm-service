@@ -2,72 +2,60 @@ import paginate from 'mongoose-paginate-v2';
 import { Document, Types } from 'mongoose';
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 
-@Schema({ collection: 'customers' })
+@Schema({ collection: 'customers', timestamps: true })
 export class Customer extends Document {
   declare _id: Types.ObjectId;
 
   @Prop({ required: true, unique: true })
   customerCode: string;
 
-  @Prop({ default: null })
-  citizenId: string;
-
-  @Prop({ default: null })
-  genderCode: string;
-
-  @Prop({ default: null })
-  firstName: string;
-
-  @Prop({ default: null })
-  lastName: string;
-
-  @Prop({ default: null })
-  firstNameEn: string;
-
-  @Prop({ default: null })
-  lastNameEn: string;
-
-  @Prop({ default: null })
-  fullName: string;
-
-  @Prop({ default: null })
-  birthDate: string;
-
-  @Prop({ default: null })
-  issueDate: string;
-
-  @Prop({ default: null })
-  issuePlace: string;
-
-  @Prop({ default: null })
-  expirationDate: string;
-
-  @Prop({ default: null })
-  email: string;
-
-  @Prop({ default: null })
-  nationality: string;
+  @Prop({ required: true })
+  customerName: string;
 
   @Prop({ default: null })
   phoneNumber: string;
 
   @Prop({ default: null })
-  lineId: string;
+  houseNo: string;
 
-  @Prop({ default: 'active' })
+  @Prop({ default: null })
+  soi: string;
+
+  @Prop({ default: null })
+  road: string;
+
+  @Prop({ default: null })
+  address: string;
+
+  @Prop({ default: null })
+  provinceId: number;
+
+  @Prop({ default: null })
+  provinceName: string;
+
+  @Prop({ default: null })
+  districtId: number;
+
+  @Prop({ default: null })
+  districtName: string;
+
+  @Prop({ default: null })
+  subDistrictId: number;
+
+  @Prop({ default: null })
+  subDistrictName: string;
+
+  @Prop({ default: null })
+  zipCode: string;
+
+  @Prop({ required: true, default: 'ACTIVE', enum: ['ACTIVE', 'INACTIVE'] })
   status: string;
 
   @Prop({ default: null })
-  createdUser: string;
+  note: string;
 
-  @Prop({ default: null })
-  updatedUser: string;
-
-  @Prop()
-  createdAt: string;
-
-  @Prop()
-  updatedAt: string;
+  declare createdAt: Date;
+  declare updatedAt: Date;
 }
 
 const CustomerSchema = SchemaFactory.createForClass(Customer);

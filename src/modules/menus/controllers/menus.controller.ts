@@ -7,6 +7,7 @@ import {
   Param,
   Post,
   Put,
+  Query,
   Res,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
@@ -14,6 +15,7 @@ import { Response } from 'express';
 import MyResponse from 'src/libraries/my-response';
 import { MenusService } from 'src/services/menus.service';
 import { CreateMenuDto, UpdateMenuDto } from '../dtos/menu.dto';
+import { PaginationDto } from 'src/dtos/pagination.dto';
 
 @ApiTags('menus')
 @Controller()
@@ -21,8 +23,15 @@ export class MenusController {
   constructor(private readonly menusService: MenusService) {}
 
   @Get()
-  async findAll(@Res() res: Response) {
-    const result = await this.menusService.find({}, { sort: { sort: 1, name: 1 } });
+  async findAll(@Query() query: PaginationDto, @Res() res: Response) {
+    const pagination = query.toPagination();
+    if (!query.sort) pagination.sort = { sort: 1, name: 1 };
+    if (!query.limit && !query.pagination?.limit) pagination.limit = 999;
+    const result = await this.menusService.pagination({
+      pagination,
+      filter: query.parsedFilter(),
+      search: query.search,
+    });
     return MyResponse.sendOk(res, result);
   }
 

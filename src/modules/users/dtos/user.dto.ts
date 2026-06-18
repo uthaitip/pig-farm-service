@@ -56,18 +56,33 @@ export class CreateUserDto {
   @ApiProperty()
   @IsNotEmpty()
   @IsString()
-  fullName: string;
+  firstName!: string;
+
+  @ApiProperty()
+  @IsNotEmpty()
+  @IsString()
+  lastName!: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  birthDate?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  startDate?: string;
 
   @ApiProperty()
   @IsNotEmpty()
   @IsEmail()
-  email: string;
+  email!: string;
 
   @ApiProperty()
   @IsNotEmpty()
   @IsString()
   @MinLength(6)
-  password: string;
+  password!: string;
 
   @ApiProperty({ required: false })
   @IsOptional()
@@ -78,6 +93,37 @@ export class CreateUserDto {
   @IsOptional()
   @IsString()
   roleId?: string;
+
+  // Embedded address fields
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  houseNo?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  village?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  subDistrict?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  district?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  province?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  postalCode?: string;
 
   @ApiProperty({ required: false, type: () => CreateUserAddressDto })
   @IsOptional()
@@ -90,7 +136,22 @@ export class UpdateUserDto {
   @ApiProperty({ required: false })
   @IsOptional()
   @IsString()
-  fullName?: string;
+  firstName?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  lastName?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  birthDate?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  startDate?: string;
 
   @ApiProperty({ required: false })
   @IsOptional()
@@ -112,17 +173,48 @@ export class UpdateUserDto {
   @IsString()
   @IsIn(['active', 'inactive'])
   status?: string;
+
+  // Embedded address fields
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  houseNo?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  village?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  subDistrict?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  district?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  province?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  postalCode?: string;
 }
 
 export class ChangePasswordDto {
   @ApiProperty()
   @IsNotEmpty()
   @IsString()
-  oldPassword: string;
+  oldPassword!: string;
 
   @ApiProperty()
   @IsNotEmpty()
   @IsString()
   @MinLength(6)
-  password: string;
+  password!: string;
 }

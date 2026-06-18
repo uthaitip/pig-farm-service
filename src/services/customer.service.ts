@@ -6,7 +6,7 @@ import { MongoService } from './mongo/mongo.service';
 
 @Injectable()
 export class CustomerService extends MongoService<Customer> {
-  searchs = ['fullName', 'firstName', 'lastName', 'phoneNumber'];
+  searchs = ['customerCode', 'customerName', 'contactName', 'phoneNumber'];
 
   constructor(@InjectModel(Customer.name) useModel: Model<Customer>) {
     super(useModel);

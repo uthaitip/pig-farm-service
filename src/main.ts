@@ -16,9 +16,11 @@ async function bootstrap() {
 
   app.setGlobalPrefix('api', { exclude: ['docs', 'docs/(.*)'] });
 
+  const port = process.env.PORT || 8082;
+
   const allowedOrigins = process.env.CORS_ORIGINS
-    ? process.env.CORS_ORIGINS.split(',')
-    : ['http://localhost:5173', 'http://localhost:8080'];
+    ? process.env.CORS_ORIGINS.split(',').map((o) => o.trim())
+    : ['http://localhost:3000'];
 
   app.enableCors({
     origin: allowedOrigins,
@@ -34,15 +36,11 @@ async function bootstrap() {
       .build();
     const document = SwaggerModule.createDocument(app, config);
     SwaggerModule.setup('docs', app, document);
-    console.log(
-      `📚 Swagger docs: http://localhost:${process.env.PORT || 8080}/docs`,
-    );
+    console.log(`📚 Swagger docs: http://localhost:${port}/docs`);
   }
 
   app.useGlobalPipes(new ValidationPipe({ transform: true, whitelist: true }));
   app.useGlobalFilters(new HttpExceptionFilter());
-
-  const port = process.env.PORT || 8080;
   await app.listen(port);
   console.log(`🐷 Pig Farm Service running on http://localhost:${port}`);
 }

@@ -1,34 +1,37 @@
 import { AnyObject } from 'src/libraries/object';
 import { ApiProperty } from '@nestjs/swagger';
 import { PaginateOptions } from 'mongoose';
-import { Type } from 'class-transformer';
+import { Transform } from 'class-transformer';
 import {
   IsArray,
-  IsNotEmpty,
   IsObject,
   IsOptional,
   IsString,
-  ValidateNested,
 } from 'class-validator';
 
-export class Pagination {
-  @ApiProperty()
-  @IsString()
-  @IsNotEmpty()
-  page: string;
+function parseJsonString(value: any) {
+  if (typeof value === 'string') {
+    try { return JSON.parse(value); } catch { return value; }
+  }
+  return value;
+}
 
-  @ApiProperty()
-  @IsString()
-  @IsNotEmpty()
-  limit: string;
+function parsePagination(value: any): { page: number; limit: number } | null {
+  const raw = typeof value === 'string' ? parseJsonString(value) : value;
+  if (!raw || typeof raw !== 'object') return null;
+  const page = Number(raw.page);
+  const limit = Number(raw.limit);
+  return {
+    page:  isNaN(page)  || page  < 1 ? 1  : page,
+    limit: isNaN(limit) || limit < 1 ? 10 : limit,
+  };
 }
 
 export class PaginationDto {
   @ApiProperty({ required: false })
   @IsOptional()
-  @ValidateNested()
-  @Type(() => Pagination)
-  pagination: Pagination;
+  @Transform(({ value }) => parsePagination(value))
+  pagination: { page: number; limit: number } | null;
 
   @IsOptional()
   page: string;
@@ -39,6 +42,7 @@ export class PaginationDto {
   @ApiProperty({ required: false })
   @IsObject()
   @IsOptional()
+  @Transform(({ value }) => parseJsonString(value))
   filter: AnyObject;
 
   @ApiProperty({ required: false })
@@ -62,43 +66,39 @@ export class PaginationDto {
   @IsObject()
   sort: AnyObject;
 
+  parsedPagination(): { page: number; limit: number } | null {
+    return this.pagination ?? null;
+  }
+
+  parsedFilter(): AnyObject {
+    if (!this.filter) return {};
+    if (typeof this.filter === 'string') {
+      try { return JSON.parse(this.filter as any); } catch { return {}; }
+    }
+    return this.filter;
+  }
+
   toPagination(): {
     page: number;
     limit: number;
     sort: AnyObject;
   } {
     const paginationOptions: any = {};
-    if (this.pagination) {
-      paginationOptions.page = Number(this.pagination.page);
-      paginationOptions.limit = Number(this.pagination.limit);
+    const pag = this.parsedPagination();
+    if (pag) {
+      paginationOptions.page  = pag.page;
+      paginationOptions.limit = pag.limit;
     } else {
-      if (this.page) {
-        paginationOptions.page = Number(this.page);
-      } else {
-        paginationOptions.page = 1;
-      }
-      if (this.limit) {
-        paginationOptions.limit = Number(this.limit);
-      } else {
-        paginationOptions.limit = 10;
-      }
+      paginationOptions.page  = this.page  ? Number(this.page)  : 1;
+      paginationOptions.limit = this.limit ? Number(this.limit) : 10;
       if (this.identities) {
         paginationOptions.limit = this.identities.length;
       }
     }
 
-    if (this.sort) {
-      paginationOptions.sort = this.sort;
-    } else {
-      paginationOptions.sort = {
-        _id: -1,
-      };
-    }
-    return paginationOptions as {
-      page: number;
-      limit: number;
-      sort: AnyObject;
-    };
+    paginationOptions.sort = this.sort ?? { _id: -1 };
+
+    return paginationOptions as { page: number; limit: number; sort: AnyObject };
   }
 }
 
@@ -107,7 +107,6 @@ export const FilterKey = {
   isNotNull: 'isNotNull',
   isNot: 'isNot',
   isArrayEmpty: 'isArrayEmpty',
-  //
   isLowerThan: 'isLt',
   isLowerThanEqual: 'isLte',
   isGreaterThan: 'isGt',

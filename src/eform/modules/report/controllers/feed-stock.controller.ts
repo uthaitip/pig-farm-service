@@ -17,8 +17,11 @@ export class FeedStockReportController {
 
   @Get()
   async report(@Res() res: Response) {
-    const stocks = await this.stockModel.find({}).sort({ name: 1 }).lean();
-    const lowStockCount = stocks.filter((s) => s.quantity <= s.minQuantity).length;
+    const stocks = await this.stockModel.find({}).populate('feedTypeId').sort({ name: 1 }).lean();
+    const lowStockCount = stocks.filter((s) => {
+      const minQty = (s.feedTypeId as any)?.minimumQuantity ?? 0;
+      return minQty > 0 && s.currentQuantity <= minQty;
+    }).length;
     const buffer = await PdfService.generate(
       path.join(process.cwd(), 'ejs/feed-stock-report.ejs'),
       {

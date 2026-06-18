@@ -2,36 +2,36 @@ import paginate from 'mongoose-paginate-v2';
 import { Document, Types } from 'mongoose';
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 
-@Schema({ collection: 'pens' })
+@Schema({ collection: 'pens', timestamps: true })
 export class Pen extends Document {
   declare _id: Types.ObjectId;
 
   @Prop({ required: true })
-  name: string;
+  penCode: string;
 
   @Prop({ required: true })
+  penName: string;
+
+  @Prop({ type: Types.ObjectId, ref: 'House', required: true })
+  houseId: Types.ObjectId;
+
+  @Prop({ required: true, default: 0 })
   capacity: number;
 
-  @Prop({ default: 0 })
+  @Prop({ required: true, default: 0 })
   currentCount: number;
 
-  @Prop({ default: 'active' })
+  @Prop({ required: true, default: 'ACTIVE' })
   status: string;
 
-  @Prop({ default: null })
-  note: string;
+  @Prop({ required: true, default: 'notFull' })
+  statusPens: string;
 
   @Prop({ default: null })
-  createdUser: string;
+  description: string;
 
-  @Prop({ default: null })
-  updatedUser: string;
-
-  @Prop()
-  createdAt: string;
-
-  @Prop()
-  updatedAt: string;
+  declare createdAt: Date;
+  declare updatedAt: Date;
 }
 
 const PenSchema = SchemaFactory.createForClass(Pen);

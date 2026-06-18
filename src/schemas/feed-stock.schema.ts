@@ -2,39 +2,18 @@ import paginate from 'mongoose-paginate-v2';
 import { Document, Types } from 'mongoose';
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 
-@Schema({ collection: 'feed_stocks' })
+@Schema({ collection: 'feed_stocks', timestamps: true })
 export class FeedStock extends Document {
   declare _id: Types.ObjectId;
 
-  @Prop({ required: true })
-  name: string;
+  @Prop({ type: Types.ObjectId, ref: 'FeedType', required: true, unique: true })
+  feedTypeId: Types.ObjectId;
 
-  @Prop({ default: null })
-  unit: string;
+  @Prop({ required: true, default: 0 })
+  currentQuantity: number;
 
-  @Prop({ default: 0 })
-  quantity: number;
-
-  @Prop({ default: 0 })
-  minQuantity: number;
-
-  @Prop({ default: 'active' })
-  status: string;
-
-  @Prop({ default: null })
-  note: string;
-
-  @Prop({ default: null })
-  createdUser: string;
-
-  @Prop({ default: null })
-  updatedUser: string;
-
-  @Prop()
-  createdAt: string;
-
-  @Prop()
-  updatedAt: string;
+  declare createdAt: Date;
+  declare updatedAt: Date;
 }
 
 const FeedStockSchema = SchemaFactory.createForClass(FeedStock);

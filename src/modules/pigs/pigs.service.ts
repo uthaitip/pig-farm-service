@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
+type PaginateModel<T> = { paginate(query?: any, options?: any): Promise<any> };
 import { Pen } from 'src/schemas/pen.schema';
 import { PigReceive } from 'src/schemas/pig-receive.schema';
 import { PigSale } from 'src/schemas/pig-sale.schema';
@@ -17,6 +18,8 @@ import {
   PigQueryDto,
 } from './dtos/pig.dto';
 
+const escapeRegex = (str: string) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
 @Injectable()
 export class PigsService {
   constructor(
@@ -29,184 +32,205 @@ export class PigsService {
     @InjectModel(Buyer.name) private readonly buyerModel: Model<Buyer>,
   ) {}
 
-  async getReceives(query: PigQueryDto) {
-    const filter: any = {};
-    if (query.penId) filter.penId = query.penId;
-    const where = filter;
-    const orQuery = query.search
-      ? [
-          { source: { $regex: new RegExp(query.search), $options: 'i' } },
-          { penName: { $regex: new RegExp(query.search), $options: 'i' } },
-        ]
-      : [];
-    const finalWhere = orQuery.length ? { ...where, $or: orQuery } : where;
-    const result = await (this.receiveModel as any).paginate(finalWhere, {
+  private async paginate<T>(
+    model: Model<T>,
+    where: Record<string, unknown>,
+    query: PigQueryDto,
+  ) {
+    const result = await (model as unknown as PaginateModel<T>).paginate(where, {
       page: query.page || 1,
       limit: query.limit || 20,
       sort: { date: -1, _id: -1 },
     });
-    return { list: result.docs, total: result.totalDocs, page: result.page, pages: result.totalPages };
+    return {
+      list: result.docs,
+      total: result.totalDocs,
+      page: result.page,
+      pages: result.totalPages,
+    };
+  }
+
+  async getReceives(query: PigQueryDto) {
+    const filter: Record<string, unknown> = {};
+    if (query.penId) filter.penId = query.penId;
+    const orQuery = query.search
+      ? [
+          { source: { $regex: new RegExp(escapeRegex(query.search)), $options: 'i' } },
+          { penName: { $regex: new RegExp(escapeRegex(query.search)), $options: 'i' } },
+        ]
+      : [];
+    const where = orQuery.length ? { ...filter, $or: orQuery } : filter;
+    return this.paginate(this.receiveModel, where, query);
   }
 
   async createReceive(dto: CreatePigReceiveDto) {
-    const pen = await this.penModel.findById(dto.penId);
-    if (!pen) throw new NotFoundException('ไม่พบข้อมูลคอก');
-    if (pen.currentCount + dto.quantity > pen.capacity)
-      throw new BadRequestException(`คอกเต็มแล้ว (ว่าง ${pen.capacity - pen.currentCount} ตัว)`);
-    pen.currentCount += dto.quantity;
-    await pen.save();
+    const pen = await this.penModel.findOneAndUpdate(
+      {
+        _id: dto.penId,
+        $expr: { $lte: [{ $add: ['$currentCount', dto.quantity] }, '$capacity'] },
+      },
+      { $inc: { currentCount: dto.quantity } },
+      { new: true },
+    );
+    if (!pen) throw new BadRequestException('ไม่พบข้อมูลคอก หรือคอกเต็มแล้ว');
     return this.receiveModel.create({
       ...dto,
-      penName: pen.name,
+      penName: pen.penName,
       createdAt: new Date().toISOString(),
     });
   }
 
   async deleteReceive(id: string) {
-    const doc = await this.receiveModel.findById(id);
+    const doc = await this.receiveModel.findByIdAndDelete(id);
     if (!doc) throw new NotFoundException('ไม่พบรายการ');
-    const pen = await this.penModel.findById(doc.penId);
-    if (pen) { pen.currentCount = Math.max(0, pen.currentCount - doc.quantity); await pen.save(); }
-    return this.receiveModel.deleteOne({ _id: id });
+    await this.penModel.updateOne(
+      { _id: doc.penId },
+      [{ $set: { currentCount: { $max: [0, { $subtract: ['$currentCount', doc.quantity] }] } } }],
+    );
+    return { deletedCount: 1 };
   }
 
   async getSales(query: PigQueryDto) {
-    const filter: any = {};
+    const filter: Record<string, unknown> = {};
     if (query.penId) filter.penId = query.penId;
     const orQuery = query.search
       ? [
-          { penName: { $regex: new RegExp(query.search), $options: 'i' } },
-          { buyer: { $regex: new RegExp(query.search), $options: 'i' } },
+          { penName: { $regex: new RegExp(escapeRegex(query.search)), $options: 'i' } },
+          { buyer: { $regex: new RegExp(escapeRegex(query.search)), $options: 'i' } },
         ]
       : [];
-    const finalWhere = orQuery.length ? { ...filter, $or: orQuery } : filter;
-    const result = await (this.saleModel as any).paginate(finalWhere, {
-      page: query.page || 1,
-      limit: query.limit || 20,
-      sort: { date: -1, _id: -1 },
-    });
-    return { list: result.docs, total: result.totalDocs, page: result.page, pages: result.totalPages };
+    const where = orQuery.length ? { ...filter, $or: orQuery } : filter;
+    return this.paginate(this.saleModel, where, query);
   }
 
   async createSale(dto: CreatePigSaleDto) {
-    const pen = await this.penModel.findById(dto.penId);
-    if (!pen) throw new NotFoundException('ไม่พบข้อมูลคอก');
-    if (dto.quantity > pen.currentCount)
-      throw new BadRequestException(`คอกมีหมูแค่ ${pen.currentCount} ตัว`);
+    const pen = await this.penModel.findOneAndUpdate(
+      { _id: dto.penId, currentCount: { $gte: dto.quantity } },
+      { $inc: { currentCount: -dto.quantity } },
+      { new: true },
+    );
+    if (!pen) throw new BadRequestException('ไม่พบข้อมูลคอก หรือมีหมูในคอกไม่เพียงพอ');
     let buyerName: string | undefined;
     if (dto.buyerId) {
       const buyer = await this.buyerModel.findById(dto.buyerId);
       buyerName = buyer?.name || undefined;
     }
-    pen.currentCount -= dto.quantity;
-    await pen.save();
     return this.saleModel.create({
       ...dto,
-      penName: pen.name,
+      penName: pen.penName,
       buyer: buyerName,
       createdAt: new Date().toISOString(),
     });
   }
 
   async deleteSale(id: string) {
-    const doc = await this.saleModel.findById(id);
+    const doc = await this.saleModel.findByIdAndDelete(id);
     if (!doc) throw new NotFoundException('ไม่พบรายการ');
-    const pen = await this.penModel.findById(doc.penId);
-    if (pen) { pen.currentCount += doc.quantity; await pen.save(); }
-    return this.saleModel.deleteOne({ _id: id });
+    await this.penModel.findByIdAndUpdate(doc.penId, {
+      $inc: { currentCount: doc.quantity },
+    });
+    return { deletedCount: 1 };
   }
 
   async getTransfers(query: PigQueryDto) {
     const orQuery = query.search
       ? [
-          { fromPenName: { $regex: new RegExp(query.search), $options: 'i' } },
-          { toPenName: { $regex: new RegExp(query.search), $options: 'i' } },
+          { fromPenName: { $regex: new RegExp(escapeRegex(query.search)), $options: 'i' } },
+          { toPenName: { $regex: new RegExp(escapeRegex(query.search)), $options: 'i' } },
         ]
       : [];
     const where = orQuery.length ? { $or: orQuery } : {};
-    const result = await (this.transferModel as any).paginate(where, {
-      page: query.page || 1,
-      limit: query.limit || 20,
-      sort: { date: -1, _id: -1 },
-    });
-    return { list: result.docs, total: result.totalDocs, page: result.page, pages: result.totalPages };
+    return this.paginate(this.transferModel, where, query);
   }
 
   async createTransfer(dto: CreatePigTransferDto) {
-    if (dto.fromPenId === dto.toPenId) throw new BadRequestException('คอกต้นทางและปลายทางต้องไม่ใช่คอกเดียวกัน');
-    const fromPen = await this.penModel.findById(dto.fromPenId);
-    if (!fromPen) throw new NotFoundException('ไม่พบคอกต้นทาง');
-    if (dto.quantity > fromPen.currentCount)
-      throw new BadRequestException(`คอกต้นทางมีหมูแค่ ${fromPen.currentCount} ตัว`);
-    const toPen = await this.penModel.findById(dto.toPenId);
-    if (!toPen) throw new NotFoundException('ไม่พบคอกปลายทาง');
-    if (toPen.currentCount + dto.quantity > toPen.capacity)
-      throw new BadRequestException(`คอกปลายทางว่างแค่ ${toPen.capacity - toPen.currentCount} ตัว`);
-    fromPen.currentCount -= dto.quantity;
-    toPen.currentCount += dto.quantity;
-    await fromPen.save();
-    await toPen.save();
+    if (dto.fromPenId === dto.toPenId)
+      throw new BadRequestException('คอกต้นทางและปลายทางต้องไม่ใช่คอกเดียวกัน');
+
+    const fromPen = await this.penModel.findOneAndUpdate(
+      { _id: dto.fromPenId, currentCount: { $gte: dto.quantity } },
+      { $inc: { currentCount: -dto.quantity } },
+      { new: true },
+    );
+    if (!fromPen) throw new BadRequestException('ไม่พบคอกต้นทาง หรือมีหมูในคอกไม่เพียงพอ');
+
+    const toPen = await this.penModel.findOneAndUpdate(
+      {
+        _id: dto.toPenId,
+        $expr: { $lte: [{ $add: ['$currentCount', dto.quantity] }, '$capacity'] },
+      },
+      { $inc: { currentCount: dto.quantity } },
+      { new: true },
+    );
+    if (!toPen) {
+      await this.penModel.findByIdAndUpdate(dto.fromPenId, {
+        $inc: { currentCount: dto.quantity },
+      });
+      throw new BadRequestException('ไม่พบคอกปลายทาง หรือคอกปลายทางเต็มแล้ว');
+    }
+
     return this.transferModel.create({
       ...dto,
-      fromPenName: fromPen.name,
-      toPenName: toPen.name,
+      fromPenName: fromPen.penName,
+      toPenName: toPen.penName,
       createdAt: new Date().toISOString(),
     });
   }
 
   async deleteTransfer(id: string) {
-    const doc = await this.transferModel.findById(id);
+    const doc = await this.transferModel.findByIdAndDelete(id);
     if (!doc) throw new NotFoundException('ไม่พบรายการ');
-    const fromPen = await this.penModel.findById(doc.fromPenId);
-    const toPen = await this.penModel.findById(doc.toPenId);
-    if (fromPen) { fromPen.currentCount += doc.quantity; await fromPen.save(); }
-    if (toPen) { toPen.currentCount = Math.max(0, toPen.currentCount - doc.quantity); await toPen.save(); }
-    return this.transferModel.deleteOne({ _id: id });
+    await this.penModel.findByIdAndUpdate(doc.fromPenId, {
+      $inc: { currentCount: doc.quantity },
+    });
+    await this.penModel.updateOne(
+      { _id: doc.toPenId },
+      [{ $set: { currentCount: { $max: [0, { $subtract: ['$currentCount', doc.quantity] }] } } }],
+    );
+    return { deletedCount: 1 };
   }
 
   async getWeights(query: PigQueryDto) {
-    const filter: any = {};
+    const filter: Record<string, unknown> = {};
     if (query.penId) filter.penId = query.penId;
-    const result = await (this.weightModel as any).paginate(filter, {
-      page: query.page || 1,
-      limit: query.limit || 20,
-      sort: { date: -1, _id: -1 },
-    });
-    return { list: result.docs, total: result.totalDocs, page: result.page, pages: result.totalPages };
+    return this.paginate(this.weightModel, filter, query);
   }
 
   async createWeight(dto: CreatePigWeightDto) {
     const pen = await this.penModel.findById(dto.penId);
     if (!pen) throw new NotFoundException('ไม่พบข้อมูลคอก');
-    return this.weightModel.create({ ...dto, penName: pen.name, createdAt: new Date().toISOString() });
+    return this.weightModel.create({
+      ...dto,
+      penName: pen.penName,
+      createdAt: new Date().toISOString(),
+    });
   }
 
   async deleteWeight(id: string) {
-    const doc = await this.weightModel.findById(id);
+    const doc = await this.weightModel.findByIdAndDelete(id);
     if (!doc) throw new NotFoundException('ไม่พบรายการ');
-    return this.weightModel.deleteOne({ _id: id });
+    return { deletedCount: 1 };
   }
 
   async getHealths(query: PigQueryDto) {
-    const filter: any = {};
+    const filter: Record<string, unknown> = {};
     if (query.penId) filter.penId = query.penId;
-    const result = await (this.healthModel as any).paginate(filter, {
-      page: query.page || 1,
-      limit: query.limit || 20,
-      sort: { date: -1, _id: -1 },
-    });
-    return { list: result.docs, total: result.totalDocs, page: result.page, pages: result.totalPages };
+    return this.paginate(this.healthModel, filter, query);
   }
 
   async createHealth(dto: CreatePigHealthDto) {
     const pen = await this.penModel.findById(dto.penId);
     if (!pen) throw new NotFoundException('ไม่พบข้อมูลคอก');
-    return this.healthModel.create({ ...dto, penName: pen.name, createdAt: new Date().toISOString() });
+    return this.healthModel.create({
+      ...dto,
+      penName: pen.penName,
+      createdAt: new Date().toISOString(),
+    });
   }
 
   async deleteHealth(id: string) {
-    const doc = await this.healthModel.findById(id);
+    const doc = await this.healthModel.findByIdAndDelete(id);
     if (!doc) throw new NotFoundException('ไม่พบรายการ');
-    return this.healthModel.deleteOne({ _id: id });
+    return { deletedCount: 1 };
   }
 }

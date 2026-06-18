@@ -18,7 +18,8 @@ import {
 
 @Injectable()
 export class UsersService extends MongoService<User> {
-  searchs = ['fullName', 'email', 'phone'];
+  searchs = ['fullName', 'firstName', 'lastName', 'email', 'phone', 'userCode'];
+  defaultPopulates = [{ path: 'roleId' }];
 
   constructor(
     @InjectModel(User.name) userModel: Model<User>,
@@ -30,15 +31,23 @@ export class UsersService extends MongoService<User> {
   async create(dto: CreateUserDto) {
     const exists = await this.findOne({ email: dto.email });
     if (exists) throw new ConflictException('อีเมลนี้ถูกใช้งานแล้ว');
+
     const hashed = await bcrypt.hash(dto.password, 10);
     const customerCode = await this.generateCustomerCode();
+    const userCode = await this.generateUserCode();
+
     const { address, ...userFields } = dto;
+    const fullName = [dto.firstName, dto.lastName].filter(Boolean).join(' ');
+
     const user = await this.insert({
       ...userFields,
+      userCode,
+      fullName,
       customerCode,
       password: hashed,
       status: 'active',
     });
+
     if (address) {
       await this.addressService.insert({
         ...(address as Record<string, unknown>),
@@ -47,7 +56,17 @@ export class UsersService extends MongoService<User> {
         isActive: 1,
       });
     }
+
     return user;
+  }
+
+  private async generateUserCode(): Promise<string> {
+    const last = await this.model
+      .findOne({ userCode: { $regex: /^U\d+$/ } })
+      .sort({ userCode: -1 });
+    if (!last?.userCode) return 'U00001';
+    const num = parseInt(last.userCode.slice(1), 10);
+    return 'U' + String(num + 1).padStart(5, '0');
   }
 
   private async generateCustomerCode(): Promise<string> {

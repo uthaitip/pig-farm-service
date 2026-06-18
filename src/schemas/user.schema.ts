@@ -6,8 +6,23 @@ import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 export class User extends Document {
   declare _id: Types.ObjectId;
 
-  @Prop({ required: true })
+  @Prop({ default: null })
+  userCode: string;
+
+  @Prop({ default: null })
   fullName: string;
+
+  @Prop({ default: null })
+  firstName: string;
+
+  @Prop({ default: null })
+  lastName: string;
+
+  @Prop({ default: null })
+  birthDate: string;
+
+  @Prop({ default: null })
+  startDate: string;
 
   @Prop({ default: null })
   username: string;
@@ -27,8 +42,27 @@ export class User extends Document {
   @Prop({ default: 'active' })
   status: string;
 
+  @Prop({ type: Types.ObjectId, ref: 'Role', default: null })
+  roleId: Types.ObjectId;
+
+  // Address fields (embedded)
   @Prop({ default: null })
-  roleId: string;
+  houseNo: string;
+
+  @Prop({ default: null })
+  village: string;
+
+  @Prop({ default: null })
+  subDistrict: string;
+
+  @Prop({ default: null })
+  district: string;
+
+  @Prop({ default: null })
+  province: string;
+
+  @Prop({ default: null })
+  postalCode: string;
 
   @Prop({ default: null })
   createdUser: string;

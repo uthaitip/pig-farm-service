@@ -13,8 +13,8 @@ import {
 import { ApiTags } from '@nestjs/swagger';
 import { Response } from 'express';
 import MyResponse from 'src/libraries/my-response';
-import { RolesService } from 'src/services/roles.service';
 import { PaginationDto } from 'src/dtos/pagination.dto';
+import { RolesService } from 'src/services/roles.service';
 import { CreateRoleDto, UpdateRoleDto } from '../dtos/role.dto';
 
 @ApiTags('roles')
@@ -24,10 +24,9 @@ export class RolesController {
 
   @Get()
   async find(@Res() res: Response, @Query() query: PaginationDto) {
-    const filter = query.filter || {};
     const result = await this.service.pagination({
       pagination: query.toPagination(),
-      filter: filter,
+      filter: query.parsedFilter(),
       search: query.search,
     });
     return MyResponse.sendOk(res, result);
@@ -42,7 +41,12 @@ export class RolesController {
 
   @Post()
   async create(@Res() res: Response, @Body() body: CreateRoleDto) {
-    const result = await this.service.insert({ ...body, status: 'active' });
+    const result = await this.service.insertWithRunning(
+      { ...body, status: 'active' },
+      'code',
+      5,
+      'R',
+    );
     return MyResponse.sendOk(res, result);
   }
 

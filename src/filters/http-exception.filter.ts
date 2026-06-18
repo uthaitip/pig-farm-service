@@ -6,76 +6,77 @@ import {
   HttpStatus,
 } from '@nestjs/common';
 
+type ExceptionResponse = {
+  message?: string | string[];
+  details?: unknown;
+};
+
+function extractMessage(exception: HttpException): string | string[] | null {
+  const raw = exception.getResponse();
+  if (typeof raw === 'string') return raw;
+  if (typeof raw === 'object' && raw !== null) {
+    return (raw as ExceptionResponse).message ?? null;
+  }
+  return null;
+}
+
 @Catch(HttpException)
 export class HttpExceptionFilter implements ExceptionFilter<HttpException> {
   catch(exception: HttpException, host: ArgumentsHost) {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse();
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-enum-comparison
     const statusCode = exception.getStatus();
+    const message = extractMessage(exception);
 
     if (statusCode === HttpStatus.UNPROCESSABLE_ENTITY) {
       return response.status(statusCode).json({
         status: statusCode,
-        error: {
-          code: 'UNPROCESSABLE_ENTITY',
-          message: exception['response']['message'] || null,
-        },
+        error: { code: 'UNPROCESSABLE_ENTITY', message },
       });
-    } else if (statusCode === HttpStatus.CONFLICT) {
+    }
+
+    if (
+      statusCode === HttpStatus.CONFLICT ||
+      statusCode === HttpStatus.NOT_FOUND ||
+      statusCode === HttpStatus.FORBIDDEN ||
+      statusCode === HttpStatus.UNAUTHORIZED
+    ) {
       return response.status(statusCode).json({
         status: statusCode,
-        error: exception['response']['message'] || null,
+        error: message,
       });
-    } else if (statusCode === HttpStatus.NOT_FOUND) {
-      return response.status(statusCode).json({
-        status: statusCode,
-        error: exception['response']['message'] || null,
-      });
-    } else if (statusCode === HttpStatus.FORBIDDEN) {
-      return response.status(statusCode).json({
-        status: statusCode,
-        error: exception['response']['message'] || null,
-      });
-    } else if (statusCode === HttpStatus.UNAUTHORIZED) {
-      return response.status(statusCode).json({
-        status: statusCode,
-        error: exception['response']['message'] || null,
-      });
-    } else if (statusCode === HttpStatus.BAD_REQUEST) {
-      let error = {};
-      try {
-        if (Array.isArray(exception['response']['message'])) {
-          for (const message of exception['response']['message']) {
-            const firstString = message.split(' ')[0];
-            error[firstString] = message.replace(
-              new RegExp(`^${firstString} `),
-              '',
-            );
-          }
-        } else {
-          error = exception['response']['message'];
+    }
+
+    if (statusCode === HttpStatus.BAD_REQUEST) {
+      let details: Record<string, string> | string | string[] | null = null;
+      if (Array.isArray(message)) {
+        details = {};
+        for (const msg of message) {
+          const field = msg.split(' ')[0];
+          details[field] = msg.replace(new RegExp(`^${field} `), '');
         }
-      } catch (e) {
-        error = exception['response']['message'];
+      } else {
+        details = message;
       }
       return response.status(statusCode).json({
         status: statusCode,
         error: {
           code: 'BAD_REQUEST',
           message: 'Invalid request body',
-          details: error,
-        },
-      });
-    } else {
-      return response.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
-        status: HttpStatus.INTERNAL_SERVER_ERROR,
-        error: {
-          code: 'INTERNAL_SERVER_ERROR',
-          message: exception['response']['message'] || 'internal server error',
-          details: exception['response']['details'] || null,
+          details,
         },
       });
     }
+
+    const isDev = process.env.NODE_ENV !== 'production';
+    return response.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
+      status: HttpStatus.INTERNAL_SERVER_ERROR,
+      error: {
+        code: 'INTERNAL_SERVER_ERROR',
+        message: isDev
+          ? (message ?? 'Internal server error')
+          : 'Internal server error',
+      },
+    });
   }
 }

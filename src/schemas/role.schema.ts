@@ -6,6 +6,9 @@ import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 export class Role extends Document {
   declare _id: Types.ObjectId;
 
+  @Prop({ default: null })
+  code: string;
+
   @Prop({ required: true })
   name: string;
 
@@ -15,8 +18,8 @@ export class Role extends Document {
   @Prop({ default: 'active' })
   status: string;
 
-  @Prop({ type: [String], default: [] })
-  menuIds: string[];
+  @Prop({ type: [{ type: Types.ObjectId, ref: 'Menu' }], default: [] })
+  menuIds: Types.ObjectId[];
 
   @Prop({ default: null })
   createdUser: string;

@@ -19,6 +19,7 @@ import MyResponse from 'src/libraries/my-response';
 import { UsersService } from 'src/services/users.service';
 import { User } from 'src/schemas/user.schema';
 import { PaginationDto } from 'src/dtos/pagination.dto';
+import { JwtPayload } from 'src/libraries/jwt-payload.interface';
 import {
   CreateUserDto,
   UpdateUserDto,
@@ -46,10 +47,9 @@ export class UsersController {
 
   @Get()
   async find(@Res() res: Response, @Query() query: PaginationDto) {
-    const filter = query.filter || {};
     const result = await this.service.pagination({
       pagination: query.toPagination(),
-      filter: filter,
+      filter: query.parsedFilter(),
       search: query.search,
       selects: ['-password'],
     });
@@ -79,7 +79,17 @@ export class UsersController {
     const item = await this.service.findByIdentity(id);
     if (!item) throw new NotFoundException('ไม่พบข้อมูลผู้ใช้');
     await this._beforeUpdate(item, body);
-    const update = await this.service.setById(item._id, body);
+
+    const updateData: Partial<UpdateUserDto & { fullName: string }> = {
+      ...body,
+    };
+    if (body.firstName !== undefined || body.lastName !== undefined) {
+      const firstName = body.firstName ?? item.firstName ?? '';
+      const lastName = body.lastName ?? item.lastName ?? '';
+      updateData.fullName = [firstName, lastName].filter(Boolean).join(' ');
+    }
+
+    const update = await this.service.setById(item._id, updateData);
     return MyResponse.sendOk(res, update);
   }
 
@@ -103,10 +113,10 @@ export class UsersController {
     @Res() res: Response,
     @Body() body: ChangePasswordDto,
   ) {
-    const currentUserId = res.locals.user?.id;
+    const currentUser = res.locals.user as JwtPayload;
     const item = await this.service.findByIdentity(id);
     if (!item) throw new NotFoundException('ไม่พบข้อมูลผู้ใช้');
-    if (item._id.toString() !== currentUserId) {
+    if (item._id.toString() !== currentUser.id) {
       throw new ForbiddenException('ไม่มีสิทธิ์เปลี่ยนรหัสผ่านของผู้ใช้อื่น');
     }
     const result = await this.service.changePassword(item._id.toString(), body);

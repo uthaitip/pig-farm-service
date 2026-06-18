@@ -1,0 +1,10 @@
+_format_version: "3.0"
+
+services:
+  - name: pig-farm-service
+    url: http://app:8082
+    routes:
+      - name: api-routes
+        paths:
+          - /api
+        strip_path: false

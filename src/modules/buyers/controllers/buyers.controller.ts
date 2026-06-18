@@ -24,7 +24,7 @@ export class BuyersController {
 
   @Get()
   async find(@Res() res: Response, @Query() query: PaginationDto) {
-    const filter = query.filter || {};
+    const filter = query.parsedFilter();
     const result = await this.service.pagination({
       pagination: query.toPagination(),
       filter: filter,

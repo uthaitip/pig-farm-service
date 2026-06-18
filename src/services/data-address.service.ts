@@ -6,6 +6,7 @@ import { MongoService } from './mongo/mongo.service';
 
 @Injectable()
 export class DataAddressService extends MongoService<DataAddress> {
+  searchs = ['code', 'name'];
   identities: string[] = ['_id', 'code'];
 
   constructor(@InjectModel(DataAddress.name) model: Model<DataAddress>) {

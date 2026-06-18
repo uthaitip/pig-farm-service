@@ -12,6 +12,7 @@ import { Role } from 'src/schemas/role.schema';
 import { Menu } from 'src/schemas/menu.schema';
 import { LoginDto } from '../dtos/login.dto';
 import { RegisterDto } from '../dtos/register.dto';
+import { JwtPayload } from 'src/libraries/jwt-payload.interface';
 
 @Injectable()
 export class AuthService {
@@ -29,7 +30,14 @@ export class AuthService {
     if (!match) throw new UnauthorizedException('อีเมลหรือรหัสผ่านไม่ถูกต้อง');
     if (user.status !== 'active') throw new UnauthorizedException('บัญชีถูกระงับการใช้งาน');
 
-    const payload = { id: user._id.toString(), email: user.email, fullName: user.fullName, roleId: user.roleId };
+    const role = await this.roleModel.findById(user.roleId).select('code');
+    const payload: JwtPayload = {
+      id: user._id.toString(),
+      email: user.email,
+      fullName: user.fullName,
+      roleId: user.roleId?.toString() ?? '',
+      roleCode: role?.code ?? '',
+    };
     const token = this.jwtService.sign(payload);
     const refreshToken = this.jwtService.sign(
       { id: user._id.toString(), type: 'refresh' },
@@ -49,12 +57,14 @@ export class AuthService {
       if (payload.type !== 'refresh') throw new UnauthorizedException('Invalid refresh token');
       const user = await this.userModel.findById(payload.id);
       if (!user || user.status !== 'active') throw new UnauthorizedException('ไม่พบผู้ใช้หรือบัญชีถูกระงับ');
+      const role = await this.roleModel.findById(user.roleId).select('code');
       const newToken = this.jwtService.sign({
         id: user._id.toString(),
         email: user.email,
         fullName: user.fullName,
-        roleId: user.roleId,
-      });
+        roleId: user.roleId?.toString() ?? '',
+        roleCode: role?.code ?? '',
+      } as JwtPayload);
       return { token: newToken };
     } catch {
       throw new UnauthorizedException('Invalid or expired refresh token');
@@ -77,28 +87,12 @@ export class AuthService {
   }
 
   async getProfile(userId: string) {
-    const user = await this.userModel.findById(userId).select('-password');
+    const user = await this.userModel
+      .findById(userId)
+      .select('_id userCode firstName lastName fullName email phone birthDate startDate roleId status')
+      .populate({ path: 'roleId', populate: { path: 'menuIds' } });
     if (!user) throw new UnauthorizedException('ไม่พบผู้ใช้');
-
-    const profile = user.toObject() as any;
-
-    if (user.roleId) {
-      const role = await this.roleModel.findById(user.roleId).lean();
-      if (role) {
-        profile.role = { _id: role._id, name: role.name, menuIds: role.menuIds ?? [] };
-        if (role.menuIds?.length) {
-          profile.menus = await this.menuModel
-            .find({ _id: { $in: role.menuIds }, status: 'active' })
-            .select('_id name path icon sort parentId')
-            .sort({ sort: 1 })
-            .lean();
-        } else {
-          profile.menus = [];
-        }
-      }
-    }
-
-    return profile;
+    return user.toObject();
   }
 
   private toProfile(user: any) {
