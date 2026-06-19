@@ -1,19 +1,4 @@
 services:
-  kong:
-    image: kong:3.6-alpine
-    environment:
-      KONG_DATABASE: "off"
-      KONG_DECLARATIVE_CONFIG: /etc/kong/kong.yml
-      KONG_PROXY_ACCESS_LOG: /dev/stdout
-      KONG_PROXY_ERROR_LOG: /dev/stderr
-    ports:
-      - "8000:8000"
-    volumes:
-      - ./kong.yml:/etc/kong/kong.yml:ro
-    depends_on:
-      - app
-    restart: unless-stopped
-
   app:
     build: .
     environment:
